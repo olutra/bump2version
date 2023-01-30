@@ -124,6 +124,8 @@ class Version:
         new_values = {}
 
         for label in order:
+            if label not in self._values:
+                continue
 
             if label == part_name:
                 new_value = self._values[label].bump()
