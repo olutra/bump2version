@@ -1,6 +1,8 @@
+IMAGE_TAG = localhost/bump3version_test
+
 test:
-	docker-compose build test
-	docker-compose run test
+	docker build -t ${IMAGE_TAG} .
+	docker run --rm ${IMAGE_TAG}
 
 local_test:
 	PYTHONPATH=. pytest tests/
@@ -10,8 +12,8 @@ lint:
 	pylint bumpversion
 
 debug_test:
-	docker-compose build test
-	docker-compose run test /bin/bash
+	docker build -t ${IMAGE_TAG} .
+	docker run -it --rm ${IMAGE_TAG} /bin/bash
 
 clean:
 	rm -rf dist build *.egg-info
