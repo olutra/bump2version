@@ -15,7 +15,7 @@ RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-instal
 RUN echo 3.7 3.8 pypy3.7 | xargs -P 4 -n 1 pyenv install
 RUN pyenv global system 3.7 3.8 pypy3.7
 
-RUN python -m pip install tox
+RUN python -m pip install nox
 
 RUN git config --global user.email "bumpversion_test@example.org"
 RUN git config --global user.name "Bumpversion Test"
@@ -23,5 +23,8 @@ RUN git config --global user.name "Bumpversion Test"
 ENV PYTHONDONTWRITEBYTECODE = 1  # prevent *.pyc files
 
 WORKDIR /code
+COPY noxfile.py .
+RUN python -m nox --install-only
+
 COPY . .
-CMD ["python", "-m", "tox"]
+CMD ["python", "-m", "nox"]
