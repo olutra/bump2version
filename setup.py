@@ -41,8 +41,9 @@ setup(
     ],
     extras_require={
         'test': [
-            'testfixtures>=1.2.0',
-            'pytest>=3.4.0',
+            'testfixtures>=7.1.0',
+            'pytest>=7.3.1',
+            'pytest-xdist>=3.2.1'
          ],
     },
 )
