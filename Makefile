@@ -13,7 +13,7 @@ lint:
 
 debug_test:
 	docker build -t ${IMAGE_TAG} .
-	docker run -it --rm ${IMAGE_TAG} /bin/bash
+	docker run -it --rm --entrypoint /bin/bash ${IMAGE_TAG}
 
 clean:
 	rm -rf dist build *.egg-info
