@@ -27,4 +27,4 @@ COPY noxfile.py .
 RUN python -m nox --install-only
 
 COPY . .
-CMD ["python", "-m", "nox"]
+ENTRYPOINT ["python", "-m", "nox"]
