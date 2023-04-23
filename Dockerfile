@@ -12,8 +12,8 @@ ENV PYENV_ROOT="/.pyenv" \
     PATH="/.pyenv/bin:/.pyenv/shims:$PATH"
 RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
 
-RUN echo 3.7 3.8 pypy3.7 | xargs -P 4 -n 1 pyenv install
-RUN pyenv global system 3.7 3.8 pypy3.7
+RUN echo 3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9 | xargs -P 4 -n 1 pyenv install
+RUN pyenv global 3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9
 
 RUN python -m pip install nox
 
