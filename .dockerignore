@@ -1,2 +1,11 @@
 # Ignore generated files
 **/*.pyc
+
+*
+
+!tests
+!bumpversion
+!tox.ini
+!setup*
+!README.md
+!noxfile.py

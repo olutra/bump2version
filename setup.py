@@ -26,7 +26,7 @@ setup(
             'bump2version = bumpversion.cli:main',
         ]
     },
-    python_requires='>=3.5',
+    python_requires='>=3.7',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -34,8 +34,6 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3 :: Only',
@@ -43,8 +41,9 @@ setup(
     ],
     extras_require={
         'test': [
-            'testfixtures>=1.2.0',
-            'pytest>=3.4.0',
+            'testfixtures>=7.1.0',
+            'pytest>=7.3.1',
+            'pytest-xdist>=3.2.1'
          ],
     },
 )

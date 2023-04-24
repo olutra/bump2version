@@ -1,15 +1,21 @@
-FROM themattrix/tox-base
+FROM debian:bullseye-slim
 
-RUN apt-get update && apt-get install -y git-core mercurial
+RUN apt update && apt-get install -y --no-install-recommends git-core mercurial
 
-# Update pyenv for access to newer Python releases.
-RUN cd /.pyenv \
-    && git fetch \
-    && git checkout v1.2.15
+# Install build environment for pyenv
+RUN apt update && apt install -y --no-install-recommends build-essential libssl-dev zlib1g-dev \
+                libbz2-dev libreadline-dev libsqlite3-dev curl ca-certificates \
+                libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
-# only install certain versions for tox to use
-RUN pyenv versions
-RUN pyenv global system 3.5.7 3.6.9 3.7.5 3.8.0 pypy3.6-7.2.0
+# Install pyenv
+ENV PYENV_ROOT="/.pyenv" \
+    PATH="/.pyenv/bin:/.pyenv/shims:$PATH"
+RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+
+RUN echo 3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9 | xargs -P 4 -n 1 pyenv install
+RUN pyenv global 3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9
+
+RUN python -m pip install nox
 
 RUN git config --global user.email "bumpversion_test@example.org"
 RUN git config --global user.name "Bumpversion Test"
@@ -17,5 +23,8 @@ RUN git config --global user.name "Bumpversion Test"
 ENV PYTHONDONTWRITEBYTECODE = 1  # prevent *.pyc files
 
 WORKDIR /code
+COPY noxfile.py .
+RUN python -m nox --install-only
+
 COPY . .
-CMD tox
+ENTRYPOINT ["python", "-m", "nox"]
