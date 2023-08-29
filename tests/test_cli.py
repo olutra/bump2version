@@ -2,8 +2,9 @@ import argparse
 import logging
 import os
 import platform
-import warnings
 import subprocess
+import sys
+import warnings
 from configparser import RawConfigParser
 from datetime import datetime
 from functools import partial
@@ -120,15 +121,22 @@ part
 [file ...]
 """.strip().splitlines()
 
-EXPECTED_USAGE = (r"""
+
+OPTIONS_SECTION_NAME = "options" if sys.version_info.minor >= 10 else "optional arguments"
+
+
+EXPECTED_USAGE = (
+r"""
 
 %s
 
 positional arguments:
   part                  Part of the version to be bumped.
   file                  Files to change (default: [])
-
-optional arguments:
+"""
+f"""
+{OPTIONS_SECTION_NAME}:"""
+r"""
   -h, --help            show this help message and exit
   --config-file FILE    Config file to read most of the variables from
                         (default: .bumpversion.cfg)
