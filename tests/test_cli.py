@@ -6,6 +6,7 @@ import subprocess
 import sys
 import warnings
 from configparser import RawConfigParser
+from contextlib import nullcontext
 from datetime import datetime
 from shlex import split as shlex_split
 from textwrap import dedent
@@ -2363,3 +2364,104 @@ def test_independent_falsy_value_in_config_does_not_bump_independently(tmpdir):
 
     main(['major'])
     assert '3.0.0-0' == tmpdir.join("VERSION").read()
+
+
+BASE_BRANCH = "base"
+NON_BASE_BRANCH = "DEV-1111"
+NON_BASE_BRANCH_2 = "second_branch"
+GIT_BRANCH_NAME_COMMAND = ["git", "symbolic-ref", "--short", "HEAD"]
+
+
+SameAsBefore = object()
+
+
+# StrEnum can be used here in the python version 3.11 and newer.
+class Part:
+    BRANCH = "branch"
+    BUILD = "build"
+    PATCH = "patch"
+
+
+@pytest.mark.xfail
+@pytest.mark.parametrize(
+    ("branch_name", "version_before", "part_to_bump", "version_after"),
+    (
+        (NON_BASE_BRANCH, "1.0.0", Part.BRANCH, f"1.0.0.{NON_BASE_BRANCH}.0"),
+        (NON_BASE_BRANCH, "1.0.0", Part.BUILD, f"1.0.0.{NON_BASE_BRANCH}.1"),
+        (NON_BASE_BRANCH, "1.0.0", Part.PATCH, SameAsBefore),
+        (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH_2}.1", Part.BRANCH, SameAsBefore),
+        (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH_2}.1", Part.BUILD, SameAsBefore),
+        (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH_2}.1", Part.PATCH, SameAsBefore),
+        (BASE_BRANCH, "1.0.0", Part.BRANCH, SameAsBefore),
+        (BASE_BRANCH, "1.0.0", Part.BUILD, SameAsBefore),
+        (BASE_BRANCH, "1.0.0", Part.PATCH, "1.0.1"),
+        (BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH}.1", Part.BRANCH, SameAsBefore),
+        (BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH}.1", Part.BUILD, SameAsBefore),
+        (BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH}.1", Part.PATCH, "1.0.1"),
+    ),
+)
+def test_bump_branch_name(
+    tmpdir,
+    git,
+    check_call,
+    check_output,
+    version_before,
+    version_after,
+    part_to_bump,
+    branch_name,
+):
+    tmpdir.chdir()
+    check_call([git, "init"])
+
+    default_branch_name_encoded = check_output(GIT_BRANCH_NAME_COMMAND)
+
+    default_branch_name = default_branch_name_encoded.decode(encoding="utf-8").strip("\n")
+    assert default_branch_name in (
+        "master",
+        "main",
+    )
+
+    bumpversion_config_file = tmpdir.join(".bumpversion.cfg")
+    bumpversion_config_file.write(
+        dedent(
+            f"""\
+                [bumpversion]
+                current_version = {version_before}"""
+            r"""
+                parse = (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(\.(?P<branch>[a-zA-Z0-9-_]+)\.(?P<build>\d+))?$
+                serialize = 
+                    {major}.{minor}.{patch}.{branch}.{build}
+                    {major}.{minor}.{patch}
+
+                """
+            f"""
+                [bumpversion:part:{Part.BRANCH}]
+                type = branch
+                base_branch = {branch_name if branch_name is BASE_BRANCH else default_branch_name}
+                """
+        )
+    )
+
+    check_call([git, "config", "user.email", "you@example.com"])
+    check_call([git, "config", "user.name", "Your Name"])
+
+    check_call([git, "add", "-A"])
+    check_call([git, "commit", "-m", "init"])
+
+    check_call([git, "branch", branch_name])
+    check_call([git, "checkout", branch_name])
+
+    assert check_output(GIT_BRANCH_NAME_COMMAND).decode(encoding="utf-8").strip("\n") == branch_name
+
+    if version_after is SameAsBefore:
+        exception_context = pytest.raises(ValueError)
+    else:
+        exception_context = nullcontext()
+
+    with exception_context:
+        main([part_to_bump])
+
+    assert (
+        bumpversion_config_file.read().splitlines()[1]
+        == f"current_version = {version_before if version_after is SameAsBefore else version_after}"
+    )
