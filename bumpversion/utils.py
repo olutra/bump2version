@@ -1,10 +1,11 @@
-from argparse import _AppendAction
-from difflib import unified_diff
 import io
 import logging
 import os
+from argparse import _AppendAction
+from difflib import unified_diff
 
 from bumpversion.exceptions import VersionNotFoundException
+
 
 logger = logging.getLogger(__name__)
 

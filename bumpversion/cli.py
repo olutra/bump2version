@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime
 import glob
 import io
 import itertools
@@ -11,22 +10,17 @@ import sys
 import warnings
 from configparser import (
     ConfigParser,
-    RawConfigParser,
     NoOptionError,
+    RawConfigParser,
 )
+from datetime import datetime
 
-from bumpversion import __version__, __title__
-from bumpversion.version_part import (
-    VersionConfig,
-    NumericVersionPartConfiguration,
-    ConfiguredVersionPartConfiguration,
-)
+from bumpversion import __title__, __version__
 from bumpversion.exceptions import (
     IncompleteVersionRepresentationException,
     MissingValueForSerializationException,
     WorkingDirectoryIsDirtyException,
 )
-
 from bumpversion.utils import (
     ConfiguredFile,
     DiscardDefaultIfSpecifiedAppendAction,
@@ -34,6 +28,11 @@ from bumpversion.utils import (
     prefixed_environ,
 )
 from bumpversion.vcs import Git, Mercurial
+from bumpversion.version_part import (
+    ConfiguredVersionPartConfiguration,
+    NumericVersionPartConfiguration,
+    VersionConfig,
+)
 
 
 DESCRIPTION = "{}: v{} (using Python v{})".format(

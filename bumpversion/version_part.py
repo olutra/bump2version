@@ -4,9 +4,9 @@ import sre_constants
 import string
 
 from bumpversion.exceptions import (
-    MissingValueForSerializationException,
     IncompleteVersionRepresentationException,
     InvalidVersionPartException,
+    MissingValueForSerializationException,
 )
 from bumpversion.functions import NumericFunction, ValuesFunction
 from bumpversion.utils import keyvaluestring
