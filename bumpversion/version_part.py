@@ -99,7 +99,7 @@ class VCSBranchPartConfiguration:
                 f"and can't be changed to {value}."
             )
 
-    def null(self, value: str) -> str:
+    def null(self, *_args, **_kwargs) -> str:
         if self.current_branch != self.base_branch:
             raise ValueError(
                 "Bumping an ancestor part is allowed only in the base branch."
@@ -284,7 +284,7 @@ class VersionConfig:
             missing_key = getattr(e, "message", e.args[0])
             raise MissingValueForSerializationException(
                 "Did not find key {} in {} when serializing version number".format(repr(missing_key), repr(version))
-            )
+            ) from None
 
         keys_needing_representation = set()
 

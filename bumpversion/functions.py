@@ -35,7 +35,7 @@ class NumericFunction(Function):
             except AttributeError:
                 raise ValueError(
                     "The given first value {} does not contain any digit".format(first_value)
-                )
+                ) from None
         else:
             first_value = "0"
 
@@ -108,7 +108,5 @@ class ValuesFunction(Function):
             return self._values[self._values.index(value) + 1]
         except IndexError:
             raise ValueError(
-                "The part has already the maximum value among {} and cannot be bumped.".format(
-                    self._values
-                )
-            )
+                f"The part has already the maximum value among {self._values} and cannot be bumped."
+            ) from None
