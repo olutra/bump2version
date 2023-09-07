@@ -2,6 +2,7 @@ import logging
 import re
 import sre_constants
 import string
+from typing import Dict, Iterable, Optional, Type, Union
 
 from bumpversion.exceptions import (
     IncompleteVersionRepresentationException,
@@ -15,37 +16,95 @@ from bumpversion.utils import keyvaluestring
 logger = logging.getLogger(__name__)
 
 
-class PartConfiguration:
+class PartType:
+    BRANCH = "branch"
 
-    function_cls = NumericFunction
+
+class PartConfiguration:
+    # TODO: Move *Function classes functionality into this class
+
+    function_cls: Union[Type[NumericFunction], Type[ValuesFunction]]
 
     def __init__(self, *args, **kwds):
         self.function = self.function_cls(*args, **kwds)
 
     @property
-    def first_value(self):
+    def first_value(self) -> str:
         return str(self.function.first_value)
 
     @property
-    def optional_value(self):
+    def optional_value(self) -> str:
         return str(self.function.optional_value)
 
     @property
-    def independent(self):
+    def independent(self) -> bool:
         return self.function.independent
 
-    def bump(self, value=None):
+    def bump(self, value: str):
         return self.function.bump(value)
+
+    def null(self, _: str) -> str:
+        return self.function.first_value
+
+    def copy(self, value: str) -> str:
+        return value
 
 
 class ConfiguredVersionPartConfiguration(PartConfiguration):
-
     function_cls = ValuesFunction
 
 
 class NumericVersionPartConfiguration(PartConfiguration):
-
     function_cls = NumericFunction
+
+
+class VCSBranchPartConfiguration:
+
+    part_name = "branch"
+
+    class Parameter:
+        BASE_BRANCH = "base_branch"
+
+    def __init__(self, base_branch: str, current_branch: Optional[str] = None) -> None:
+        if current_branch is None:
+            raise ValueError(f"Error getting current branch name. The {self.part_name} part cannot be used.")
+        if not isinstance(base_branch, str):
+            raise ValueError(f"The {self.Parameter.BASE_BRANCH} parameter should be string.")
+        self.base_branch = base_branch
+        self.optional_value = base_branch
+        self.current_branch = current_branch
+        self.independent = False
+
+    def bump(self, value: str) -> str:
+        if self.current_branch == self.base_branch:
+            raise ValueError(f"Can't bump the {self.part_name} part in the base branch.")
+        if value == self.current_branch:
+            raise ValueError(f"The {self.part_name} part already has value '{value}'.")
+        if value != self.base_branch:
+            raise ValueError(
+                f"The {self.part_name} part is already set to {self.current_branch} and can't be changed "
+                f"to {value}, it can only be reset by bumping an ancestor part from the base branch."
+            )
+        return self.current_branch
+
+    def copy(self, value: str) -> str:
+        if value == self.base_branch:
+            if value == self.current_branch:
+                raise ValueError(
+                    f"Bumping a descendant of the {self.part_name} part isn't allowed in the base branch."
+                )
+            return self.current_branch
+        raise ValueError(
+                f"The {self.part_name} part is already set to {self.current_branch} "
+                f"and can't be changed to {value}."
+            )
+
+    def null(self, value: str) -> str:
+        if self.current_branch != self.base_branch:
+            raise ValueError(
+                "Bumping an ancestor part is allowed only in the base branch."
+            )
+        return self.current_branch
 
 
 class VersionPart:
@@ -54,51 +113,52 @@ class VersionPart:
 
     Offer a self.config object that rules how the part behaves when
     increased or reset.
+
+    TODO: Merge *Function classes with the descendant of this one.
     """
 
-    def __init__(self, value, config=None):
+    def __init__(self, value: str, config=None):
         self._value = value
 
         if config is None:
             config = NumericVersionPartConfiguration()
 
-        self.config = config
+        self.config: Union[
+            NumericVersionPartConfiguration, ConfiguredVersionPartConfiguration, VCSBranchPartConfiguration
+        ] = config
 
     @property
-    def value(self):
+    def value(self) -> str:
         return self._value or self.config.optional_value
 
-    def copy(self):
-        return VersionPart(self._value)
+    def copy(self) -> "VersionPart":
+        return VersionPart(value=self.config.copy(self.value), config=self.config)
 
-    def bump(self):
-        return VersionPart(self.config.bump(self.value), self.config)
+    def bump(self) -> "VersionPart":
+        return VersionPart(value=self.config.bump(self.value), config=self.config)
 
-    def is_optional(self):
+    def null(self) -> "VersionPart":
+        return VersionPart(value=self.config.null(self.value), config=self.config)
+
+    def is_optional(self) -> bool:
         return self.value == self.config.optional_value
 
-    def is_independent(self):
+    def is_independent(self) -> bool:
         return self.config.independent
 
-    def __format__(self, format_spec):
+    def __format__(self, format_spec) -> str:
         return self.value
 
     def __repr__(self):
-        return "<bumpversion.VersionPart:{}:{}>".format(
-            self.config.__class__.__name__, self.value
-        )
+        return "<bumpversion.VersionPart:{}:{}>".format(self.config.__class__.__name__, self.value)
 
     def __eq__(self, other):
         return self.value == other.value
 
-    def null(self):
-        return VersionPart(self.config.first_value, self.config)
-
 
 class Version:
-
-    def __init__(self, values, original=None):
-        self._values = dict(values)
+    def __init__(self, values: Dict[str, VersionPart], original=None) -> None:
+        self._values: Dict[str, VersionPart] = dict(values)
         self.original = original
 
     def __getitem__(self, key):
@@ -110,10 +170,13 @@ class Version:
     def __iter__(self):
         return iter(self._values)
 
+    def items(self):
+        return self._values.items()
+
     def __repr__(self):
         return "<bumpversion.Version:{}>".format(keyvaluestring(self._values))
 
-    def bump(self, part_name, order):
+    def bump(self, part_name: str, order: Iterable[str]) -> "Version":
         bumped = False
 
         new_values = {}
@@ -121,13 +184,14 @@ class Version:
         for label in order:
             if label not in self._values:
                 continue
+            part = self._values[label]
             if label == part_name:
-                new_values[label] = self._values[label].bump()
+                new_values[label] = part.bump()
                 bumped = True
-            elif bumped and not self._values[label].is_independent():
-                new_values[label] = self._values[label].null()
+            elif bumped and not part.is_independent():
+                new_values[label] = part.null()
             else:
-                new_values[label] = self._values[label].copy()
+                new_values[label] = part.copy()
 
         if not bumped:
             raise InvalidVersionPartException("No part named %r" % part_name)
@@ -138,9 +202,7 @@ class Version:
 
 
 def labels_for_format(serialize_format):
-    return (
-        label for _, label, _, _ in string.Formatter().parse(serialize_format) if label
-    )
+    return (label for _, label, _, _ in string.Formatter().parse(serialize_format) if label)
 
 
 class VersionConfig:
@@ -170,13 +232,11 @@ class VersionConfig:
         # this seems like a good idea because this should be the most complete format
         return labels_for_format(self.serialize_formats[0])
 
-    def parse(self, version_string):
+    def parse(self, version_string: Optional[str]) -> Optional[Version]:
         if not version_string:
             return None
 
-        regexp_one_line = "".join(
-            [l.split("#")[0].strip() for l in self.parse_regex.pattern.splitlines()]
-        )
+        regexp_one_line = "".join([line.split("#")[0].strip() for line in self.parse_regex.pattern.splitlines()])
 
         logger.info(
             "Parsing version '%s' using regexp '%s'",
@@ -211,8 +271,8 @@ class VersionConfig:
         Raises MissingValueForSerializationException if not serializable
         """
         values = context.copy()
-        for k in version:
-            values[k] = version[k]
+        for part_name, version_part in version.items():
+            values[part_name] = version_part
 
         # TODO dump complete context on debug level
 
@@ -223,9 +283,7 @@ class VersionConfig:
         except KeyError as e:
             missing_key = getattr(e, "message", e.args[0])
             raise MissingValueForSerializationException(
-                "Did not find key {} in {} when serializing version number".format(
-                    repr(missing_key), repr(version)
-                )
+                "Did not find key {} in {} when serializing version number".format(repr(missing_key), repr(version))
             )
 
         keys_needing_representation = set()
@@ -240,7 +298,7 @@ class VersionConfig:
                 continue
 
             if not v.is_optional():
-                keys_needing_representation = set(keys[:i+1])
+                keys_needing_representation = set(keys[: i + 1])
 
         required_by_format = set(labels_for_format(serialize_format))
 
@@ -263,9 +321,7 @@ class VersionConfig:
 
         for serialize_format in self.serialize_formats:
             try:
-                self._serialize(
-                    version, serialize_format, context, raise_if_incomplete=True
-                )
+                self._serialize(version, serialize_format, context, raise_if_incomplete=True)
                 # Prefer shorter or first search expression.
                 chosen_part_count = None if not chosen else len(list(string.Formatter().parse(chosen)))
                 serialize_part_count = len(list(string.Formatter().parse(serialize_format)))
@@ -274,7 +330,7 @@ class VersionConfig:
                     logger.debug("Found '%s' to be a usable serialization format", chosen)
                 else:
                     logger.debug("Found '%s' usable serialization format, but it's longer", serialize_format)
-            except IncompleteVersionRepresentationException as e:
+            except IncompleteVersionRepresentationException:
                 # If chosen, prefer shorter
                 if not chosen:
                     chosen = serialize_format
@@ -290,8 +346,6 @@ class VersionConfig:
         return chosen
 
     def serialize(self, version, context):
-        serialized = self._serialize(
-            version, self._choose_serialize_format(version, context), context
-        )
+        serialized = self._serialize(version, self._choose_serialize_format(version, context), context)
         logger.debug("Serialized to '%s'", serialized)
         return serialized

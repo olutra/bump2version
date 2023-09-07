@@ -13,7 +13,9 @@ from configparser import (
     NoOptionError,
     RawConfigParser,
 )
+from contextlib import suppress
 from datetime import datetime
+from functools import partial
 
 from bumpversion import __title__, __version__
 from bumpversion.exceptions import (
@@ -31,6 +33,7 @@ from bumpversion.vcs import Git, Mercurial
 from bumpversion.version_part import (
     ConfiguredVersionPartConfiguration,
     NumericVersionPartConfiguration,
+    VCSBranchPartConfiguration,
     VersionConfig,
 )
 
@@ -52,6 +55,8 @@ RE_DETECT_SECTION_TYPE = re.compile(
     r"((?P<file>file|glob)(\s*\(\s*(?P<file_suffix>[^\):]+)\)?)?|(?P<part>part)):"
     r"(?P<value>.+)",
 )
+
+BUMP3VERSION_VCS_BRANCH_NAME = "BUMP3VERSION_VCS_BRANCH_NAME"
 
 logger_list = logging.getLogger("bumpversion.list")
 logger = logging.getLogger(__name__)
@@ -86,7 +91,7 @@ def main(original_args=None):
         explicit_config = known_args.config_file
     config_file = _determine_config_file(explicit_config)
     config, config_file_exists, config_newlines, part_configs, files = _load_configuration(
-        config_file, explicit_config, defaults,
+        config_file, explicit_config, defaults, vcs_info=vcs_info,
     )
     known_args, parser2, remaining_argv = _parse_arguments_phase_2(
         args, known_args, defaults, root_parser
@@ -104,9 +109,16 @@ def main(original_args=None):
 
     # calculate the desired new version
     new_version = _assemble_new_version(
-        context, current_version, defaults, known_args.current_version, positionals, version_config
+        context,
+        current_version,
+        defaults,
+        known_args.current_version,
+        positionals,
+        version_config,
     )
-    args, file_names = _parse_arguments_phase_3(remaining_argv, positionals, defaults, parser2)
+    args, file_names = _parse_arguments_phase_3(
+        remaining_argv, positionals, defaults, parser2
+    )
     new_version = _parse_new_version(args, new_version, version_config)
 
     # do not use the files from the config
@@ -168,6 +180,7 @@ def _parse_arguments_phase_1(original_args):
             "Giving multiple files on the command line will be deprecated, "
             "please use [bumpversion:file:...] in a config file.",
             PendingDeprecationWarning,
+            stacklevel=2,
         )
     root_parser = argparse.ArgumentParser(add_help=False)
     root_parser.add_argument(
@@ -228,6 +241,10 @@ def _determine_vcs_usability():
     for vcs in VCS:
         if vcs.is_usable():
             vcs_info.update(vcs.latest_tag_info())
+
+            # ToDo: make without exception
+            with suppress(NotImplementedError):
+                vcs_info[BUMP3VERSION_VCS_BRANCH_NAME] = vcs.get_branch_name()
     return vcs_info
 
 
@@ -246,7 +263,7 @@ def _determine_config_file(explicit_config):
     return ".bumpversion.cfg"
 
 
-def _load_configuration(config_file, explicit_config, defaults):
+def _load_configuration(config_file, explicit_config, defaults, vcs_info):
     # setup.cfg supports interpolation - for compatibility we must do the same.
     if os.path.basename(config_file) == "setup.cfg":
         config = ConfigParser("")
@@ -280,6 +297,7 @@ def _load_configuration(config_file, explicit_config, defaults):
         warnings.warn(
             "'files =' configuration will be deprecated, please use [bumpversion:file:...]",
             PendingDeprecationWarning,
+            stacklevel=2,
         )
 
     defaults.update(dict(config.items("bumpversion")))
@@ -317,7 +335,14 @@ def _load_configuration(config_file, explicit_config, defaults):
         if section_type.get("part"):
             ThisVersionPartConfiguration = NumericVersionPartConfiguration
 
-            if "values" in section_config:
+            if "type" in section_config:
+                _type = section_config.pop("type")
+                if _type == "branch":
+                    ThisVersionPartConfiguration = partial(
+                        VCSBranchPartConfiguration,
+                        current_branch=vcs_info.get(BUMP3VERSION_VCS_BRANCH_NAME),
+                    )
+            elif "values" in section_config:
                 section_config["values"] = list(
                     filter(
                         None,
@@ -422,7 +447,7 @@ def _parse_arguments_phase_2(args, known_args, defaults, root_parser):
     return known_args, parser2, remaining_argv
 
 
-def _setup_versionconfig(known_args, part_configs):
+def _setup_versionconfig(known_args, part_configs) -> VersionConfig:
     try:
         version_config = VersionConfig(
             parse=known_args.parse,
@@ -452,7 +477,7 @@ def _assemble_new_version(
             logger.info("Opportunistic finding of new_version failed: %s", e.message)
         except IncompleteVersionRepresentationException as e:
             logger.info("Opportunistic finding of new_version failed: %s", e.message)
-        except KeyError as e:
+        except KeyError:
             logger.info("Opportunistic finding of new_version failed")
     return new_version
 
@@ -477,7 +502,10 @@ def _parse_arguments_phase_3(remaining_argv, positionals, defaults, parser2):
         action="store_true",
         default=False,
         dest="no_configured_files",
-        help="Only replace the version in files specified on the command line, ignoring the files from the configuration file.",
+        help=(
+            "Only replace the version in files specified on the command line, "
+            "ignoring the files from the configuration file."
+        ),
     )
     parser3.add_argument(
         "--dry-run",
@@ -583,9 +611,9 @@ def _parse_arguments_phase_3(remaining_argv, positionals, defaults, parser2):
     return args, file_names
 
 
-def _parse_new_version(args, new_version, vc):
+def _parse_new_version(args, new_version, version_config: VersionConfig):
     if args.new_version:
-        new_version = vc.parse(args.new_version)
+        new_version = version_config.parse(args.new_version)
     logger.info("New version will be '%s'", args.new_version)
     return new_version
 
@@ -657,7 +685,8 @@ def _update_config_file(
     except UnicodeEncodeError:
         warnings.warn(
             "Unable to write UTF-8 to config file, because of an old configparser version. "
-            "Update with `pip install --upgrade configparser`."
+            "Update with `pip install --upgrade configparser`.",
+            stacklevel=2,
         )
 
 

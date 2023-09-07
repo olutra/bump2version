@@ -2382,7 +2382,6 @@ class Part:
     PATCH = "patch"
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize(
     ("branch_name", "version_before", "part_to_bump", "version_after"),
     (

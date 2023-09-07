@@ -1,7 +1,15 @@
 import re
+from typing import List, Optional
 
 
-class NumericFunction:
+class Function:
+    first_value: str
+
+    def null(self, *_) -> str:
+        return self.first_value
+
+
+class NumericFunction(Function):
 
     """
     This is a class that provides a numeric function for version parts.
@@ -17,7 +25,7 @@ class NumericFunction:
 
     FIRST_NUMERIC = re.compile(r"([^\d]*)(\d+)(.*)")
 
-    def __init__(self, first_value=None, independent=False):
+    def __init__(self, first_value: Optional[str] = None, independent: bool = False) -> None:
 
         if first_value is not None:
             try:
@@ -29,13 +37,13 @@ class NumericFunction:
                     "The given first value {} does not contain any digit".format(first_value)
                 )
         else:
-            first_value = 0
+            first_value = "0"
 
         self.first_value = str(first_value)
         self.optional_value = self.first_value
         self.independent = independent
 
-    def bump(self, value):
+    def bump(self, value: str) -> str:
         part_prefix, part_numeric, part_suffix = self.FIRST_NUMERIC.search(
             value
         ).groups()
@@ -44,7 +52,7 @@ class NumericFunction:
         return "".join([part_prefix, str(bumped_numeric), part_suffix])
 
 
-class ValuesFunction:
+class ValuesFunction(Function):
 
     """
     This is a class that provides a values list based function for version parts.
@@ -58,8 +66,13 @@ class ValuesFunction:
     you get a ValueError exception.
     """
 
-    def __init__(self, values, optional_value=None, first_value=None, independent=False):
-
+    def __init__(
+        self,
+        values: List[str],
+        optional_value: Optional[str] = None,
+        first_value: Optional[str] = None,
+        independent: bool = False,
+    ) -> None:
         if not values:
             raise ValueError("Version part values cannot be empty")
 
@@ -90,7 +103,7 @@ class ValuesFunction:
         self.first_value = first_value
         self.independent = independent
 
-    def bump(self, value):
+    def bump(self, value: str) -> str:
         try:
             return self._values[self._values.index(value) + 1]
         except IndexError:
