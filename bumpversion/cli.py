@@ -5,7 +5,6 @@ import itertools
 import logging
 import os
 import re
-import sre_constants
 import sys
 import warnings
 from configparser import (
@@ -22,6 +21,7 @@ from bumpversion.exceptions import (
     IncompleteVersionRepresentationException,
     MissingValueForSerializationException,
     WorkingDirectoryIsDirtyException,
+    VersionConfigInitializationException,
 )
 from bumpversion.utils import (
     ConfiguredFile,
@@ -449,17 +449,16 @@ def _parse_arguments_phase_2(args, known_args, defaults, root_parser):
 
 def _setup_versionconfig(known_args, part_configs) -> VersionConfig:
     try:
-        version_config = VersionConfig(
+        return VersionConfig(
             parse=known_args.parse,
             serialize=known_args.serialize,
             search=known_args.search,
             replace=known_args.replace,
             part_configs=part_configs,
         )
-    except sre_constants.error:
-        # TODO: use re.error here mayhaps, also: should we log?
-        sys.exit(1)
-    return version_config
+    except VersionConfigInitializationException:
+        # TODO: should we log?
+        raise SystemExit(1)
 
 
 def _assemble_new_version(

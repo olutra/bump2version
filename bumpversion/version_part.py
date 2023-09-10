@@ -1,6 +1,5 @@
 import logging
 import re
-import sre_constants
 import string
 from typing import Dict, Iterable, Optional, Type, Union
 
@@ -8,6 +7,7 @@ from bumpversion.exceptions import (
     IncompleteVersionRepresentationException,
     InvalidVersionPartException,
     MissingValueForSerializationException,
+    VersionConfigInitializationException,
 )
 from bumpversion.functions import NumericFunction, ValuesFunction
 from bumpversion.utils import keyvaluestring
@@ -213,10 +213,9 @@ class VersionConfig:
     def __init__(self, parse, serialize, search, replace, part_configs=None):
         try:
             self.parse_regex = re.compile(parse, re.VERBOSE)
-        except sre_constants.error as e:
-            # TODO: use re.error here mayhaps
+        except re.error:
             logger.error("--parse '%s' is not a valid regex", parse)
-            raise e
+            raise VersionConfigInitializationException
 
         self.serialize_formats = serialize
 
