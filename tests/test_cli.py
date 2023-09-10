@@ -2389,6 +2389,7 @@ class Part:
     (
         (NON_BASE_BRANCH, "1.0.0", Part.BRANCH, f"1.0.0.{NON_BASE_BRANCH}.0"),
         (NON_BASE_BRANCH, "1.0.0", Part.BUILD, f"1.0.0.{NON_BASE_BRANCH}.1"),
+        (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH}.1", Part.BUILD, f"1.0.0.{NON_BASE_BRANCH}.2"),
         (NON_BASE_BRANCH, "1.0.0", Part.PATCH, SameAsBefore),
         (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH_2}.1", Part.BRANCH, SameAsBefore),
         (NON_BASE_BRANCH, f"1.0.0.{NON_BASE_BRANCH_2}.1", Part.BUILD, SameAsBefore),

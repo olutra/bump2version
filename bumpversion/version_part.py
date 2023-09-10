@@ -76,27 +76,29 @@ class VCSBranchPartConfiguration:
         self.independent = False
 
     def bump(self, value: str) -> str:
+        branch_during_bump = value
         if self.current_branch == self.base_branch:
             raise ValueError(f"Can't bump the {self.part_name} part in the base branch.")
-        if value == self.current_branch:
-            raise ValueError(f"The {self.part_name} part already has value '{value}'.")
-        if value != self.base_branch:
+        if branch_during_bump == self.current_branch:
+            raise ValueError(f"The {self.part_name} part already has value '{branch_during_bump}'.")
+        if branch_during_bump != self.base_branch:
             raise ValueError(
                 f"The {self.part_name} part is already set to {self.current_branch} and can't be changed "
-                f"to {value}, it can only be reset by bumping an ancestor part from the base branch."
+                f"to {branch_during_bump}, it can only be reset by bumping an ancestor part from the base branch."
             )
         return self.current_branch
 
     def copy(self, value: str) -> str:
-        if value == self.base_branch:
-            if value == self.current_branch:
-                raise ValueError(
-                    f"Bumping a descendant of the {self.part_name} part isn't allowed in the base branch."
-                )
+        branch_from_previous_version = value
+        if self.base_branch == self.current_branch == branch_from_previous_version:
+            raise ValueError(
+                f"Bumping a descendant of the {self.part_name} part isn't allowed in the base branch."
+            )
+        if branch_from_previous_version in (self.base_branch, self.current_branch):
             return self.current_branch
         raise ValueError(
                 f"The {self.part_name} part is already set to {self.current_branch} "
-                f"and can't be changed to {value}."
+                f"and can't be changed to {branch_from_previous_version}."
             )
 
     def null(self, *_args, **_kwargs) -> str:
