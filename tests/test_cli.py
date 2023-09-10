@@ -174,6 +174,7 @@ def test_usage_string_fork(tmpdir, check_output):
     except subprocess.CalledProcessError as e:
         out = e.output
 
+    # TODO: Remove the print statement. Pytest in the verbose mode will show the difference.
     if b'usage: bumpversion [-h]' not in out:
         print(out)
 
@@ -1094,17 +1095,17 @@ def test_utf8_message_from_config_file(tmpdir, vcs, check_call, check_output):
 current_version = 500.0.0
 commit = True
 message = Nová verze: {current_version} ☃, {new_version} ☀
-
 """
 
-    tmpdir.join(".bumpversion.cfg").write(initial_config.encode('utf-8'), mode='wb')
+    config_file = tmpdir.join(".bumpversion.cfg")
+    config_file.write(initial_config.encode('utf-8'), mode='wb')
     main(['major', 'VERSION'])
     check_output([vcs, "log", "-p"])
     expected_new_config = initial_config.replace('500', '501')
-    assert expected_new_config.encode('utf-8') == tmpdir.join(".bumpversion.cfg").read(mode='rb')
+    assert expected_new_config.encode('utf-8') == config_file.read(mode='rb')
 
 
-def test_utf8_message_from_config_file(tmpdir, vcs, check_call, check_output):
+def test_now_utcnow(tmpdir, vcs, check_call, check_output):
     tmpdir.chdir()
     check_call([vcs, "init"])
     tmpdir.join("VERSION").write("10.10.0")
@@ -1367,6 +1368,7 @@ def test_subjunctive_dry_run_logging(tmpdir, vcs, check_call):
     tmpdir.join("dont_touch_me.txt").write("0.8")
     tmpdir.chdir()
 
+    # TODO: Fix mixed tabs and spaces
     tmpdir.join(".bumpversion.cfg").write(dedent(r"""
         [bumpversion]
         current_version = 0.8
