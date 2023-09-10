@@ -30,3 +30,7 @@ class VersionNotFoundException(BumpVersionException):
 
 class InvalidVersionPartException(BumpVersionException):
     """The specified part (e.g. 'bugfix') was not found"""
+
+
+class VersionConfigInitializationException(BumpVersionException):
+    ...

@@ -1,0 +1,13 @@
+[tool.black]
+line-length = 120
+target-version = ["py37"]
+
+[tool.mypy]
+python_version = 3.7
+
+[tool.ruff]
+line-length = 120
+select = ["ARG", "B", "E", "F", "I", "PT", "W"]
+
+[tool.ruff.isort]
+lines-after-imports = 2

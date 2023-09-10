@@ -2,21 +2,27 @@ import errno
 import logging
 import os
 import subprocess
+from abc import ABC
 from tempfile import NamedTemporaryFile
+from typing import List
 
 from bumpversion.exceptions import (
-    WorkingDirectoryIsDirtyException,
     MercurialDoesNotSupportSignedTagsException,
+    WorkingDirectoryIsDirtyException,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
-class BaseVCS:
+class BaseVCS(ABC):
 
-    _TEST_USABLE_COMMAND = None
-    _COMMIT_COMMAND = None
+    _TEST_USABLE_COMMAND: List[str]
+    _COMMIT_COMMAND: List[str]
+
+    @classmethod
+    def get_branch_name(cls) -> str:
+        raise NotImplementedError
 
     @classmethod
     def commit(cls, message, context, extra_args=None):
@@ -41,7 +47,7 @@ class BaseVCS:
             os.unlink(f.name)
 
     @classmethod
-    def is_usable(cls):
+    def is_usable(cls) -> bool:
         try:
             return (
                 subprocess.call(
@@ -61,6 +67,7 @@ class Git(BaseVCS):
 
     _TEST_USABLE_COMMAND = ["git", "rev-parse", "--git-dir"]
     _COMMIT_COMMAND = ["git", "commit", "-F"]
+    _BRANCH_NAME_COMMAND = ["git", "symbolic-ref", "--short", "HEAD"]
 
     @classmethod
     def assert_nondirty(cls):
@@ -78,6 +85,18 @@ class Git(BaseVCS):
                     b"\n".join(lines).decode()
                 )
             )
+
+    @classmethod
+    def get_branch_name(cls) -> str:
+        try:
+            branch_name_output = subprocess.check_output(
+                cls._BRANCH_NAME_COMMAND
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error("Error when getting git branch name")
+            raise e from None
+        branch_name = branch_name_output.decode("utf-8").strip("\n")
+        return branch_name
 
     @classmethod
     def latest_tag_info(cls):
